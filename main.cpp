@@ -53,28 +53,46 @@ int main(int argc, char const *argv[])
 
         std::string data = sock->receiveAll();
 
+        sock->closeConnection();
+
         res = HttpResponse::parse(data);
 
         std::string contentDisposition = res.getHeader("Content-Disposition");
         std::string contentType = res.getHeader("Content-Type");
+        std::string contentLength = res.getHeader("Content-Length");
+        std::string transferEncoding = res.getHeader("Transfer-Encoding");
 
-        if (contentType.empty())
+        // simple logs
         {
-            std::clog << "content type not found!!" << std::endl;
+            if (contentType.empty())
+                std::clog << "content type not found!!" << std::endl;
+            else
+                std::clog << "content type: " << contentType << std::endl;
+            if (contentLength.empty())
+                std::clog << "content length not found!!" << std::endl;
+            else
+                std::clog << "content length: " << contentLength << std::endl;
+            if (transferEncoding.empty())
+                std::clog << "transfer encoding not found!!" << std::endl;
+            else
+                std::clog << "transfer encoding:" << transferEncoding << std::endl;
         }
 
         if (contentType.starts_with("text/") || contentType.starts_with("application/json"))
             std::cout << res.getContent() << std::endl;
         else
         {
-            std::clog << data << std::endl;
+            // std::clog << data << std::endl;
             auto [filename, extension] = getFilenameAndExtension(contentDisposition, contentType);
             saveToFile("downloads/" + filename + extension, res.getContent());
+            std::cout << "after saving file" << std::endl;
         }
+        exit(EXIT_SUCCESS);
     }
     catch (const std::exception &e)
     {
         std::cerr << e.what() << '\n';
+        exit(EXIT_FAILURE);
     }
 
     return 0;

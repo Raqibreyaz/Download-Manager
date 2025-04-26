@@ -51,19 +51,31 @@ std::pair<std::string, std::string> getFilenameAndExtension(
         if (std::regex_search(contentDisposition, match, filenameRegex))
         {
             std::string filename = match[1];
-            return {filename, ""}; // Extension already included in filename
+
+            // ✨ Clean filename from \r and \n
+            filename.erase(std::remove(filename.begin(), filename.end(), '\r'), filename.end());
+            filename.erase(std::remove(filename.begin(), filename.end(), '\n'), filename.end());
+
+            return {filename, ""}; // Extension already included
         }
     }
 
     size_t semicolon = contentType.find(';');
-
     if (semicolon == std::string::npos)
         semicolon = contentType.size();
 
     auto parts = split(contentType.substr(0, semicolon), '/');
 
-    // Default name (eg. image/png-> name: image, ext: png)
-    return {parts.size() > 0 ? parts[0] : "download", parts.size() > 1 ? ("." + parts[1]) : ".bin"};
+    std::string name = parts.size() > 0 ? parts[0] : "download";
+    std::string ext = parts.size() > 1 ? ("." + parts[1]) : ".bin";
+
+    // ✨ Clean name and ext (rarely needed but safe)
+    name.erase(std::remove(name.begin(), name.end(), '\r'), name.end());
+    name.erase(std::remove(name.begin(), name.end(), '\n'), name.end());
+    ext.erase(std::remove(ext.begin(), ext.end(), '\r'), ext.end());
+    ext.erase(std::remove(ext.begin(), ext.end(), '\n'), ext.end());
+
+    return {name, ext};
 }
 
 std::vector<std::string> split(const std::string &str, const char &delim)
@@ -84,11 +96,21 @@ std::vector<std::string> split(const std::string &str, const char &delim)
 
 void saveToFile(const std::string &filename, const std::string &data)
 {
-    // open file in write mode
-    std::ofstream file(filename, std::ios::binary);
+    std::clog << "[DEBUG] Trying to open file: '" << filename << "'" << std::endl;
 
+    std::ofstream file(filename, std::ios::binary);
     if (!file)
-        return throw std::runtime_error("failed to create/open the file");
+    {
+        int err = errno; // system error code
+        std::clog << "[ERROR] Failed to open file. errno = " << err
+                  << " (" << std::strerror(err) << ")" << std::endl;
+
+        auto dir = std::filesystem::path(filename).parent_path();
+        std::clog << "[DEBUG] Parent directory: '" << dir.string() << "'" << std::endl;
+        std::clog << "[DEBUG] Directory exists: " << (std::filesystem::exists(dir) ? "YES" : "NO") << std::endl;
+
+        throw std::runtime_error("failed to create/open the file");
+    }
 
     file.write(data.c_str(), data.size());
 }

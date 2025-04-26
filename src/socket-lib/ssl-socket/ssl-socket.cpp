@@ -93,17 +93,26 @@ std::string SslSocket::receiveAll()
     char buffer[4096];
     int bytesRead;
 
-    while ((bytesRead = SSL_read(ssl, buffer, sizeof(buffer))) > 0)
+    while (true)
     {
-        result.append(buffer, bytesRead);
+        bytesRead = SSL_read(ssl, buffer, sizeof(buffer));
+        if (bytesRead > 0)
+        {
+            result.append(buffer, bytesRead);
+        }
+        else
+        {
+            int err = SSL_get_error(ssl, bytesRead);
+            if (err == SSL_ERROR_ZERO_RETURN)
+                // Proper shutdown, no more data
+                break;
+            else if (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE)
+                // Non-fatal, just retry
+                continue;
+            else
+                throw std::runtime_error("SSL_read failed with error: " + std::to_string(err));
+        }
     }
-
-    if (bytesRead < 0)
-    {
-        int err = SSL_get_error(ssl, bytesRead);
-        throw std::runtime_error("SSL_read failed with error: " + std::to_string(err));
-    }
-
     return result;
 }
 
@@ -113,18 +122,22 @@ void SslSocket::closeConnection()
     {
         SSL_shutdown(ssl);
         SSL_free(ssl);
+        OPENSSL_cleanup();
         ssl = nullptr;
+        std::clog << "ssl freed" << std::endl;
     }
 
     if (ctx)
     {
         SSL_CTX_free(ctx);
         ctx = nullptr;
+        std::clog << "ctx freed" << std::endl;
     }
 
     if (sockfd >= 0)
     {
         close(sockfd);
         sockfd = -1;
+        std::clog << "socket freed" << std::endl;
     }
 }

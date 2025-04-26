@@ -1,11 +1,15 @@
 #pragma once
 
 #include <string>
+#include <cstring>
+#include <cerrno>
+#include <filesystem>
 #include <stdexcept>
 #include <regex>
 #include <vector>
 #include <sstream>
 #include <fstream>
+#include <iostream>
 
 struct ParsedUrl
 {

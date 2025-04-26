@@ -40,6 +40,22 @@
     "tuple": "cpp",
     "type_traits": "cpp",
     "typeinfo": "cpp",
-    "variant": "cpp"
+    "variant": "cpp",
+    "atomic": "cpp",
+    "bitset": "cpp",
+    "cstdarg": "cpp",
+    "deque": "cpp",
+    "vector": "cpp",
+    "algorithm": "cpp",
+    "functional": "cpp",
+    "iterator": "cpp",
+    "memory": "cpp",
+    "memory_resource": "cpp",
+    "numeric": "cpp",
+    "random": "cpp",
+    "regex": "cpp",
+    "utility": "cpp",
+    "fstream": "cpp",
+    "cinttypes": "cpp"
   }
 }
