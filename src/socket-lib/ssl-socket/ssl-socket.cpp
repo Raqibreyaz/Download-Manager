@@ -76,9 +76,12 @@ void SslSocket::sendAll(const std::string &data)
     size_t totalSent = 0;
     while (totalSent < data.size())
     {
-        ssize_t sent = send(sockfd, data.c_str() + totalSent, data.size() - totalSent, 0);
-        if (sent < 0)
-            throw std::runtime_error("send failed");
+        int sent = SSL_write(ssl, data.c_str() + totalSent, data.size() - totalSent);
+        if (sent <= 0)
+        {
+            int err = SSL_get_error(ssl, sent);
+            throw std::runtime_error("SSL_write failed with error: " + std::to_string(err));
+        }
         totalSent += sent;
     }
     std::clog << "securely sent " << totalSent << " bytes data" << std::endl;
@@ -88,15 +91,19 @@ std::string SslSocket::receiveAll()
 {
     std::string result;
     char buffer[4096];
-    ssize_t bytesRead;
-    while ((bytesRead = recv(sockfd, buffer, sizeof(buffer), 0)) > 0)
+    int bytesRead;
+
+    while ((bytesRead = SSL_read(ssl, buffer, sizeof(buffer))) > 0)
     {
         result.append(buffer, bytesRead);
     }
-    if (bytesRead < 0)
-        throw std::runtime_error("recv failed");
 
-    std::clog << "securely received data from server" << std::endl;
+    if (bytesRead < 0)
+    {
+        int err = SSL_get_error(ssl, bytesRead);
+        throw std::runtime_error("SSL_read failed with error: " + std::to_string(err));
+    }
+
     return result;
 }
 

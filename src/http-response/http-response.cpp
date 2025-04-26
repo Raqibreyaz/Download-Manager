@@ -9,6 +9,18 @@ HttpResponse::HttpResponse(const std::string &ver,
                            const std::string &bdy)
     : version(ver), statusCode(sc), statusMessage(sm), headers(hdr), body(bdy) {}
 
+std::string HttpResponse::getHeader(const std::string &key)
+{
+    auto it = this->headers.find(key);
+
+    return it == this->headers.end() ? "" : it->second;
+}
+
+std::string HttpResponse::getContent()
+{
+    return this->body;
+}
+
 std::string HttpResponse::toString() const
 {
     std::ostringstream oss;
@@ -33,7 +45,7 @@ HttpResponse HttpResponse::parse(const std::string &responseBuffer)
     statusLine >> res.version >> res.statusCode;
     std::getline(statusLine, res.statusMessage); // Rest of the line
 
-    if (res.statusMessage.empty() && res.statusMessage.back() == '\r')
+    if (!res.statusMessage.empty() && res.statusMessage.back() == '\r')
         res.statusMessage.pop_back();
 
     // Headers
@@ -48,6 +60,12 @@ HttpResponse HttpResponse::parse(const std::string &responseBuffer)
             // triming leading spaces
             value.erase(0, value.find_first_not_of(" \t\r\n"));
 
+            if (key.find("Content-Type") != std::string::npos)
+                std::clog << "content type found: " << value << std::endl;
+
+            if (key.find("Content-Disposition") != std::string::npos)
+                std::clog << "content name found: " << value << std::endl;
+
             res.headers[key] = value;
         }
     }
@@ -60,4 +78,4 @@ HttpResponse HttpResponse::parse(const std::string &responseBuffer)
     return res;
 }
 
-HttpResponse::~HttpResponse(){}
+HttpResponse::~HttpResponse() {}

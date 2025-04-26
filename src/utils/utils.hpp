@@ -2,6 +2,10 @@
 
 #include <string>
 #include <stdexcept>
+#include <regex>
+#include <vector>
+#include <sstream>
+#include <fstream>
 
 struct ParsedUrl
 {
@@ -11,3 +15,11 @@ struct ParsedUrl
 };
 
 ParsedUrl parseUrl(const std::string &url);
+
+std::pair<std::string, std::string> getFilenameAndExtension(
+    const std::string &contentDisposition,
+    const std::string &contentType);
+
+std::vector<std::string> split(const std::string &str, const char &delim);
+
+void saveToFile(const std::string &filename, const std::string &data);

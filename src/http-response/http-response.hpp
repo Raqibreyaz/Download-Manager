@@ -3,6 +3,7 @@
 #include <string>
 #include <unordered_map>
 #include <sstream>
+#include <iostream>
 
 class HttpResponse
 {
@@ -21,6 +22,8 @@ public:
         const std::unordered_map<std::string, std::string> &headers,
         const std::string &body);
     ~HttpResponse();
+    std::string getHeader(const std::string &key);
+    std::string getContent();
     std::string toString() const;
     static HttpResponse parse(const std::string &responseBuffer);
 };
