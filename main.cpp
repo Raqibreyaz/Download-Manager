@@ -7,7 +7,7 @@
 #include <iostream>
 #include <string>
 #include <memory>
-
+    
 int main(int argc, char const *argv[])
 {
     if (argc < 2)
