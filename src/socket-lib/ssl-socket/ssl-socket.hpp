@@ -23,6 +23,7 @@ public:
 
     void connectToServer() override;
     std::string receiveAll() override;
+    std::string receiveSome(const int size) override;
     void sendAll(const std::string &data) override;
     void closeConnection() override;
 };

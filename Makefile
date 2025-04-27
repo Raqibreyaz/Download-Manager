@@ -8,8 +8,9 @@ SRCS = main.cpp \
 		src/socket-lib/tcp-socket/tcp-socket.cpp \
 		src/socket-lib/ssl-socket/ssl-socket.cpp \
 		src/socket-lib/isocket/isocket.cpp \
-		src/http-request/http-request.cpp \
-		src/http-response/http-response.cpp \
+		src/http/http-request/http-request.cpp \
+		src/http/http-response/http-response.cpp \
+		src/http/http-stream-reader/http-stream-reader.cpp \
 		src/utils/utils.cpp 
 
 # names of all the object files

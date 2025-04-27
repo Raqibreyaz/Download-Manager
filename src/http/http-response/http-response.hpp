@@ -25,5 +25,11 @@ public:
     std::string getHeader(const std::string &key);
     std::string getContent();
     std::string toString() const;
+    void setHeader(const std::pair<std::string, std::string> &header);
+    void setHeaders(const std::unordered_map<std::string, std::string> &headers);
+    void setContent(const std::string &body);
     static HttpResponse parse(const std::string &responseBuffer);
+    void parseStatusLine(const std::string &responseBuffer);
+    static std::unordered_map<std::string, std::string> parseHeaders(const std::string &data);
+    static std::string parseBody(const std::string &responseBuffer);
 };

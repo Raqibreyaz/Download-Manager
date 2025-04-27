@@ -114,3 +114,81 @@ void saveToFile(const std::string &filename, const std::string &data)
 
     file.write(data.c_str(), data.size());
 }
+
+int hexaDecimalToDecimal(const std::string &num)
+{
+    int number = std::stoi(num, nullptr, 16);
+    std::clog << "converted number: " << number << " from: " << num << std::endl;
+    return number;
+}
+
+std::string readChunksAndSaveToFile(const std::string &buffer, const std::string &filename)
+{
+    // 4\r\n
+    // abcd\r\n
+
+    // work on the copy of it
+    std::string temp = buffer;
+
+    // tracks of is the value a number or string data
+    bool isChunkSize = true;
+
+    // getting total size by summation of all chunk sizes
+    int totalLength = 0;
+
+    // appending all chunked data in this string
+    std::string data = "";
+
+    // will have the preserved line
+    // which is !completely received
+    std::string returnValue = "";
+
+    size_t startPos = 0;
+    while (startPos < temp.size())
+    {
+        size_t stopPos = temp.find("\r\n", startPos);
+
+        // when we cant find the end of line then this line should be preserved
+        // so return this line
+        if (stopPos == std::string::npos)
+        {
+            returnValue = temp.substr(startPos);
+            break;
+        }
+
+        std::string value = temp.substr(startPos, stopPos - startPos);
+
+        // if it is a size then convert to number
+        if (isChunkSize)
+        {
+            int size = hexaDecimalToDecimal(value);
+
+            if (size == 0)
+                break;
+
+            std::clog << value << " size" << std::endl;
+            totalLength += size;
+        }
+        // if it is a data then append to string
+        else
+        {
+            data.append(value);
+            std::clog << value << " data" << std::endl;
+        }
+
+        // update boolean
+        isChunkSize = !isChunkSize;
+
+        // move start to next value
+        startPos = stopPos + 2;
+    }
+
+    if (totalLength != data.size())
+        std::cerr << "Inconsistent chunked size and data received" << std::endl;
+
+    // saving the received data to the file
+    saveToFile(filename, data);
+
+    // return the preserved line
+    return returnValue;
+}

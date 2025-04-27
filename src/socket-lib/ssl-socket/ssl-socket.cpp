@@ -116,6 +116,38 @@ std::string SslSocket::receiveAll()
     return result;
 }
 
+std::string SslSocket::receiveSome(const int size)
+{
+    std::string result;
+    char buffer[1024];
+    int bytesRead;
+    int totalBytesRead = 0;
+
+    // read only the needed amount of data
+    while (totalBytesRead < size)
+    {
+        bytesRead = SSL_read(ssl, buffer, sizeof(buffer));
+        if (bytesRead > 0)
+        {
+            result.append(buffer, bytesRead);
+            totalBytesRead += bytesRead;
+        }
+        else
+        {
+            int err = SSL_get_error(ssl, bytesRead);
+            if (err == SSL_ERROR_ZERO_RETURN)
+                // Proper shutdown, no more data
+                break;
+            else if (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE)
+                // Non-fatal, just retry
+                continue;
+            else
+                throw std::runtime_error("SSL_read failed with error: " + std::to_string(err));
+        }
+    }
+    return result;
+}
+
 void SslSocket::closeConnection()
 {
     if (ssl)

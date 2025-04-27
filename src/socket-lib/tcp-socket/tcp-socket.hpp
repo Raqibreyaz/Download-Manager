@@ -8,6 +8,7 @@
 #include <netdb.h>
 #include <sys/socket.h>
 #include <iostream>
+#include <sstream>
 
 class TcpSocket : public ISocket
 {
@@ -23,6 +24,8 @@ public:
     void sendAll(const std::string &data) override;
 
     std::string receiveAll() override;
+
+    std::string receiveSome(const int size) override;
 
     void closeConnection() override;
 };

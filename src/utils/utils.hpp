@@ -10,6 +10,7 @@
 #include <sstream>
 #include <fstream>
 #include <iostream>
+#include <unistd.h>
 
 struct ParsedUrl
 {
@@ -27,3 +28,7 @@ std::pair<std::string, std::string> getFilenameAndExtension(
 std::vector<std::string> split(const std::string &str, const char &delim);
 
 void saveToFile(const std::string &filename, const std::string &data);
+
+int hexaDecimalToDecimal(const std::string &num);
+
+std::string readChunksAndSaveToFile(const std::string &buffer,const std::string& filename);

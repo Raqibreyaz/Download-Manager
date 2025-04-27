@@ -69,7 +69,25 @@ std::string TcpSocket::receiveAll()
     if (bytesRead < 0)
         throw std::runtime_error("recv failed");
 
-    std::clog<<bytesRead<<" bytes data received from server"<<std::endl;
+    std::clog << bytesRead << " bytes data received from server" << std::endl;
+    return result;
+}
+
+std::string TcpSocket::receiveSome(const int size)
+{
+    char buffer[1024];
+    int totalLength = 0;
+    std::string result;
+
+    while (totalLength < size)
+    {
+        int bytesRead = recv(this->sockfd, buffer, sizeof(buffer) - 1, 0);
+
+        if (bytesRead < 0)
+            throw std::runtime_error("failed to recv data");
+        totalLength += bytesRead;
+        result.append(buffer);
+    }
     return result;
 }
 

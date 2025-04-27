@@ -1,5 +1,6 @@
-#include "src/http-request/http-request.hpp"
-#include "src/http-response/http-response.hpp"
+#include "src/http/http-request/http-request.hpp"
+#include "src/http/http-response/http-response.hpp"
+#include "src/http/http-stream-reader/http-stream-reader.hpp"
 #include "src/socket-lib/tcp-socket/tcp-socket.hpp"
 #include "src/socket-lib/ssl-socket/ssl-socket.hpp"
 #include "src/utils/utils.hpp"
@@ -32,67 +33,75 @@ int main(int argc, char const *argv[])
           "Safari/537.36"},
          {"Connection", "close"}});
 
+    std::shared_ptr<ISocket> sock;
     HttpResponse res;
-
-    std::unique_ptr<ISocket> sock;
 
     try
     {
+        // create a socket for that host and port
         if (actualUrl.find("https") != std::string::npos)
-            sock = std::make_unique<SslSocket>(url.host, url.port);
+            sock = std::make_shared<SslSocket>(url.host, url.port);
         else
-            sock = std::make_unique<TcpSocket>(url.host, url.port);
+            sock = std::make_shared<TcpSocket>(url.host, url.port);
 
+        // connect to the server
         sock->connectToServer();
 
+        // send request to server
         const std::string requestBuffer = req.toString();
-
         std::clog << "request: " << requestBuffer << std::endl;
+        sock->sendAll(requestBuffer);
 
-        sock->sendAll(req.toString());
+        // a reader helper to read different kinds of data
+        HttpStreamReader reader(sock);
 
-        std::string data = sock->receiveAll();
+        // read headers first
+        std::string headerString = reader.readHeaders();
 
-        sock->closeConnection();
+        res.setHeaders(HttpResponse::parseHeaders(headerString));
 
-        res = HttpResponse::parse(data);
-
-        std::string contentDisposition = res.getHeader("Content-Disposition");
+        std::string contentLengthString = res.getHeader("Content-Length");
         std::string contentType = res.getHeader("Content-Type");
-        std::string contentLength = res.getHeader("Content-Length");
-        std::string transferEncoding = res.getHeader("Transfer-Encoding");
+        std::string contentDisposition = res.getHeader("Content-Disposition");
+        size_t contentLength =
+            contentLengthString.empty() ? 0 : std::stoi(contentLengthString);
 
-        // simple logs
+        auto [filename, extension] = getFilenameAndExtension(contentDisposition, contentType);
+
+        // chunked content will be saved in a file
+        if (res.getHeader("Transfer-Encoding") == "chunked")
         {
-            if (contentType.empty())
-                std::clog << "content type not found!!" << std::endl;
-            else
-                std::clog << "content type: " << contentType << std::endl;
-            if (contentLength.empty())
-                std::clog << "content length not found!!" << std::endl;
-            else
-                std::clog << "content length: " << contentLength << std::endl;
-            if (transferEncoding.empty())
-                std::clog << "transfer encoding not found!!" << std::endl;
-            else
-                std::clog << "transfer encoding:" << transferEncoding << std::endl;
+            reader.readChunkedContent([filename, extension](const std::string &data)
+                                      {
+                std::ofstream outputFile("downloads/"+filename+extension,std::ios::binary| std::ios::app);
+
+                if(!outputFile.is_open())
+                throw std::runtime_error("Failed to open file");
+
+                outputFile.write(data.c_str(),data.size()); });
         }
 
-        if (contentType.starts_with("text/") || contentType.starts_with("application/json"))
-            std::cout << res.getContent() << std::endl;
+        // logable content will be logged
+        else if (contentType.starts_with("text/") || contentType.starts_with("application/json"))
+        {
+            std::clog << reader.readContent(contentLength) << std::endl;
+        }
+
+        // read the content and save it to that corresponding file
         else
         {
-            // std::clog << data << std::endl;
-            auto [filename, extension] = getFilenameAndExtension(contentDisposition, contentType);
-            saveToFile("downloads/" + filename + extension, res.getContent());
-            std::cout << "after saving file" << std::endl;
+            reader.readContent(contentLength,
+                               [filename, extension](const std::string &data)
+                               {
+                                   saveToFile("downloads/" + filename + extension, data);
+                               });
         }
-        exit(EXIT_SUCCESS);
+
+        sock->closeConnection();
     }
     catch (const std::exception &e)
     {
         std::cerr << e.what() << '\n';
-        exit(EXIT_FAILURE);
     }
 
     return 0;
