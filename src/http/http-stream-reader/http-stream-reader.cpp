@@ -8,36 +8,33 @@ std::string HttpStreamReader::readHeaders()
     int sizeForHeaders = 4096;
     std::string data = socket->receiveSome(sizeForHeaders);
 
-    // finding the statusLine ending
-    size_t statusLineEnding = data.find_first_of("\r\n") + 2;
-
-    // there can be a case when only body is received so no headers
+    // status line end dhundho (properly find "\r\n")
+    size_t statusLineEnding = data.find("\r\n");
     if (statusLineEnding == std::string::npos)
     {
         this->preBuffer += data;
         return "";
     }
+    statusLineEnding += 2; // move after \r\n
 
-    // findind the headers ending
-    size_t headersEnding = data.find_first_of("\r\n\r\n", statusLineEnding);
-
-    // no way but a fallback
+    // headers end dhundho (properly find "\r\n\r\n")
+    size_t headersEnding = data.find("\r\n\r\n", statusLineEnding);
     if (headersEnding == std::string::npos)
     {
         this->preBuffer += data;
         return "";
     }
 
-    // extracting the headers string
+    // Extract headers
     std::string headers = data.substr(statusLineEnding, headersEnding - statusLineEnding);
 
-    // store the rest of the data in pre buffer
-    this->preBuffer += data.substr(headersEnding);
+    // Save body data (after \r\n\r\n)
+    this->preBuffer += data.substr(headersEnding + 4);
 
     return headers;
 }
 
-std::string HttpStreamReader::readContent(const size_t contentLength = 0, const std::function<void(const std::string &data)> &callback = nullptr)
+std::string HttpStreamReader::readContent(const size_t contentLength = 0, const std::function<void(const std::string &data)> &callback)
 {
     std::string receivedData =
         contentLength == 0 ? socket->receiveAll() : socket->receiveSome(contentLength);
@@ -102,6 +99,43 @@ void HttpStreamReader::readChunkedContent(const std::function<void(const std::st
     {
         onData(accumulatedData);
     }
+}
+
+void HttpStreamReader::readSpecifiedChunkedContent(const size_t contentLength, const std::function<void(const std::string &data)> &callback)
+{
+    if (contentLength == 0)
+    {
+        readContent(contentLength, callback);
+        return;
+    }
+
+    size_t remainingData = contentLength;
+    std::string accumulatedData = preBuffer; // Start with any leftover data in preBuffer
+
+    while (remainingData > 0)
+    {
+        size_t chunkSize = std::min(remainingData, (size_t)1024U); // Adjust chunk size based on the remaining data
+
+        // Receive data from socket
+        std::string receivedData = socket->receiveSome(chunkSize);
+        accumulatedData += receivedData; // Add new data to accumulated data
+
+        // If we have enough data, process it
+        if (accumulatedData.size() >= chunkSize)
+        {
+            size_t toProcess = chunkSize;
+            std::string dataToProcess = accumulatedData.substr(0, toProcess); // Take the required amount of data
+            callback(dataToProcess);                                          // Call the callback with the processed data
+
+            // Remove processed data from the accumulated data
+            accumulatedData.erase(0, toProcess);
+
+            remainingData -= toProcess; // Update remaining data length
+        }
+    }
+
+    // Any leftover data goes into preBuffer for future reads
+    preBuffer = accumulatedData;
 }
 
 size_t HttpStreamReader::getChunkSize()

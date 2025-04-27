@@ -156,20 +156,20 @@ void SslSocket::closeConnection()
         SSL_free(ssl);
         OPENSSL_cleanup();
         ssl = nullptr;
-        std::clog << "ssl freed" << std::endl;
+        // std::clog << "ssl freed" << std::endl;
     }
 
     if (ctx)
     {
         SSL_CTX_free(ctx);
         ctx = nullptr;
-        std::clog << "ctx freed" << std::endl;
+        // std::clog << "ctx freed" << std::endl;
     }
 
     if (sockfd >= 0)
     {
         close(sockfd);
         sockfd = -1;
-        std::clog << "socket freed" << std::endl;
+        // std::clog << "socket freed" << std::endl;
     }
 }

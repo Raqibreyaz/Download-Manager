@@ -49,7 +49,6 @@ int main(int argc, char const *argv[])
 
         // send request to server
         const std::string requestBuffer = req.toString();
-        std::clog << "request: " << requestBuffer << std::endl;
         sock->sendAll(requestBuffer);
 
         // a reader helper to read different kinds of data
@@ -57,6 +56,8 @@ int main(int argc, char const *argv[])
 
         // read headers first
         std::string headerString = reader.readHeaders();
+
+        std::clog << "received headers " << headerString << std::endl;
 
         res.setHeaders(HttpResponse::parseHeaders(headerString));
 
@@ -68,17 +69,14 @@ int main(int argc, char const *argv[])
 
         auto [filename, extension] = getFilenameAndExtension(contentDisposition, contentType);
 
+        std::clog << "filename " << filename << extension << std::endl;
+
         // chunked content will be saved in a file
         if (res.getHeader("Transfer-Encoding") == "chunked")
         {
+            std::clog << "chunked transfer found" << std::endl;
             reader.readChunkedContent([filename, extension](const std::string &data)
-                                      {
-                std::ofstream outputFile("downloads/"+filename+extension,std::ios::binary| std::ios::app);
-
-                if(!outputFile.is_open())
-                throw std::runtime_error("Failed to open file");
-
-                outputFile.write(data.c_str(),data.size()); });
+                                      { saveToFile("downloads/" + filename + extension, data); });
         }
 
         // logable content will be logged
@@ -90,11 +88,9 @@ int main(int argc, char const *argv[])
         // read the content and save it to that corresponding file
         else
         {
-            reader.readContent(contentLength,
-                               [filename, extension](const std::string &data)
-                               {
-                                   saveToFile("downloads/" + filename + extension, data);
-                               });
+            std::clog << "reading whole data directly" << std::endl;
+            reader.readSpecifiedChunkedContent(contentLength, [filename, extension](const std::string &data)
+                                               { saveToFile("downloads/" + filename + extension, data); });
         }
 
         sock->closeConnection();

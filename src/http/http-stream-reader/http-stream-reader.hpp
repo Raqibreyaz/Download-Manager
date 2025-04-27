@@ -16,6 +16,7 @@ public:
     std::string readHeaders();                                                                                                   // reads only the headers from buffer
     std::string readContent(const size_t contentLength, const std::function<void(const std::string &data)> &callback = nullptr); // reads the body from the buffer
     void readChunkedContent(const std::function<void(const std::string &)> &callback);                                           // reads the chunked data via buffer
+    void readSpecifiedChunkedContent(const size_t contentLength,const std::function<void(const std::string&)>& callback);
 private:
     size_t getChunkSize();
     void ensureCRLF();
