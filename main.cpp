@@ -7,7 +7,7 @@
 #include <iostream>
 #include <string>
 #include <memory>
-    
+
 int main(int argc, char const *argv[])
 {
     if (argc < 2)
@@ -18,8 +18,10 @@ int main(int argc, char const *argv[])
 
     std::string actualUrl(argv[1]);
 
+    // extract the host, path and port from the url
     ParsedUrl url = parseUrl(actualUrl);
 
+    // create a HttpRequest object for requesting to server
     HttpRequest req(
         "GET", url.path, "HTTP/1.1",
         {{"Accept", "*/*"},
@@ -33,7 +35,10 @@ int main(int argc, char const *argv[])
           "Safari/537.36"},
          {"Connection", "close"}});
 
+    // a socket for connecting, sending/receiving data to/from server
     std::shared_ptr<ISocket> sock;
+
+    // for storing the response from server
     HttpResponse res;
 
     try
@@ -48,8 +53,7 @@ int main(int argc, char const *argv[])
         sock->connectToServer();
 
         // send request to server
-        const std::string requestBuffer = req.toString();
-        sock->sendAll(requestBuffer);
+        sock->sendAll(req.toString());
 
         // a reader helper to read different kinds of data
         HttpStreamReader reader(sock);
@@ -57,21 +61,33 @@ int main(int argc, char const *argv[])
         // read headers first
         std::string headerString = reader.readHeaders();
 
-        std::clog << "received headers " << headerString << std::endl;
-
+        // set the received headers
         res.setHeaders(HttpResponse::parseHeaders(headerString));
 
+        // extract key info from the headers
         std::string contentLengthString = res.getHeader("Content-Length");
         std::string contentType = res.getHeader("Content-Type");
         std::string contentDisposition = res.getHeader("Content-Disposition");
         size_t contentLength =
             contentLengthString.empty() ? 0 : std::stoi(contentLengthString);
 
-        auto [filename, extension] = getFilenameAndExtension(contentDisposition, contentType);
-
+        // find the filename with extension
+        auto [filename, extension] = getFilenameAndExtension(contentDisposition, contentType, actualUrl);
         std::clog << "filename " << filename << extension << std::endl;
 
-        // chunked content will be saved in a file
+        int fileDownloadStatus = isFileDownloadedOrPartially("downloads/" + filename + extension, contentLength);
+
+        std::clog << "file download status: " << fileDownloadStatus << std::endl;
+
+        // when file is already downloaded then skip downloading
+        if (fileDownloadStatus == 1)
+        {
+            std::clog << "file is already downloaded" << std::endl;
+            sock->closeConnection();
+            return 0;
+        }
+
+        // handle chunked data(will be saved to file)
         if (res.getHeader("Transfer-Encoding") == "chunked")
         {
             std::clog << "chunked transfer found" << std::endl;
@@ -79,20 +95,20 @@ int main(int argc, char const *argv[])
                                       { saveToFile("downloads/" + filename + extension, data); });
         }
 
-        // logable content will be logged
+        // log text like content
         else if (contentType.starts_with("text/") || contentType.starts_with("application/json"))
         {
             std::clog << reader.readContent(contentLength) << std::endl;
         }
 
-        // read the content and save it to that corresponding file
+        // handle receiving large data(will be saved to file)
         else
         {
-            std::clog << "reading whole data directly" << std::endl;
             reader.readSpecifiedChunkedContent(contentLength, [filename, extension](const std::string &data)
                                                { saveToFile("downloads/" + filename + extension, data); });
         }
 
+        // finally close the connection to server
         sock->closeConnection();
     }
     catch (const std::exception &e)

@@ -1,5 +1,6 @@
 #include "tcp-socket.hpp"
 
+// create a TCP socket from the provided host and port
 TcpSocket::TcpSocket(const std::string &h, const std::string &p) : sockfd(-1), host(h), port(p) {}
 
 TcpSocket::~TcpSocket()
@@ -7,6 +8,7 @@ TcpSocket::~TcpSocket()
     this->closeConnection();
 }
 
+// create a TCP connection to the server
 void TcpSocket::connectToServer()
 {
     struct addrinfo hints{}, *res;
@@ -44,6 +46,7 @@ void TcpSocket::connectToServer()
     std::clog << "connected to server" << std::endl;
 }
 
+// send the provided data to the peer
 void TcpSocket::sendAll(const std::string &data)
 {
     size_t totalSent = 0;
@@ -54,9 +57,9 @@ void TcpSocket::sendAll(const std::string &data)
             throw std::runtime_error("send failed");
         totalSent += sent;
     }
-    std::clog << "Sent " << totalSent << " bytes data to server" << std::endl;
 }
 
+// receive all the available data from the peer
 std::string TcpSocket::receiveAll()
 {
     std::string result;
@@ -69,10 +72,10 @@ std::string TcpSocket::receiveAll()
     if (bytesRead < 0)
         throw std::runtime_error("recv failed");
 
-    std::clog << bytesRead << " bytes data received from server" << std::endl;
     return result;
 }
 
+// receive some specified amount of data from the peer
 std::string TcpSocket::receiveSome(const int size)
 {
     char buffer[1024];
@@ -85,12 +88,19 @@ std::string TcpSocket::receiveSome(const int size)
 
         if (bytesRead < 0)
             throw std::runtime_error("failed to recv data");
+
+        // when done receiving all the data from peer
+        if (bytesRead == 0)
+            break;
+
+        // append the received data
         totalLength += bytesRead;
         result.append(buffer);
     }
     return result;
 }
 
+// close the TCP connection 
 void TcpSocket::closeConnection()
 {
     if (sockfd != -1)

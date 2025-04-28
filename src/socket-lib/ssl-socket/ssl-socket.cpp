@@ -1,5 +1,6 @@
 #include "ssl-socket.hpp"
 
+// create a SSL socket from the provided host and port
 SslSocket::SslSocket(const std::string &host, const std::string &port)
     : host(host), port(port), ctx(nullptr), ssl(nullptr), sockfd(-1) {}
 
@@ -8,6 +9,7 @@ SslSocket::~SslSocket()
     this->closeConnection();
 }
 
+// create a secure TLS connection to server
 void SslSocket::connectToServer()
 {
     OPENSSL_init_ssl(0, nullptr);
@@ -71,6 +73,7 @@ void SslSocket::connectToServer()
     std::clog << "securely connected to server" << std::endl;
 }
 
+// send the provided data to the peer
 void SslSocket::sendAll(const std::string &data)
 {
     size_t totalSent = 0;
@@ -84,9 +87,9 @@ void SslSocket::sendAll(const std::string &data)
         }
         totalSent += sent;
     }
-    std::clog << "securely sent " << totalSent << " bytes data" << std::endl;
 }
 
+// read all the data provided
 std::string SslSocket::receiveAll()
 {
     std::string result;
@@ -100,15 +103,20 @@ std::string SslSocket::receiveAll()
         {
             result.append(buffer, bytesRead);
         }
+        // handle any error occured
         else
         {
             int err = SSL_get_error(ssl, bytesRead);
+
+            // when no data avaialable then exit
             if (err == SSL_ERROR_ZERO_RETURN)
-                // Proper shutdown, no more data
                 break;
+
+            // when a retriable error to receive data, then retry
             else if (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE)
-                // Non-fatal, just retry
                 continue;
+
+            // otherwise throw error
             else
                 throw std::runtime_error("SSL_read failed with error: " + std::to_string(err));
         }
@@ -116,6 +124,7 @@ std::string SslSocket::receiveAll()
     return result;
 }
 
+// recieve some specified amount of data
 std::string SslSocket::receiveSome(const int size)
 {
     std::string result;
@@ -132,15 +141,20 @@ std::string SslSocket::receiveSome(const int size)
             result.append(buffer, bytesRead);
             totalBytesRead += bytesRead;
         }
+        // handle any error occured
         else
         {
             int err = SSL_get_error(ssl, bytesRead);
+
+            // when no data avaialable then exit
             if (err == SSL_ERROR_ZERO_RETURN)
-                // Proper shutdown, no more data
                 break;
+
+            // when a retriable error to receive data, then retry
             else if (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE)
-                // Non-fatal, just retry
                 continue;
+
+            // otherwise throw error
             else
                 throw std::runtime_error("SSL_read failed with error: " + std::to_string(err));
         }
@@ -148,6 +162,7 @@ std::string SslSocket::receiveSome(const int size)
     return result;
 }
 
+// securely close the ssl connection
 void SslSocket::closeConnection()
 {
     if (ssl)

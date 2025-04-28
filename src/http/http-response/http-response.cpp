@@ -1,6 +1,6 @@
 #include "http-response.hpp"
 
-// assigning default values
+// create HttpResponse object from default values
 HttpResponse::HttpResponse()
     : version("HTTP/1.1"),
       statusCode(200),
@@ -8,7 +8,7 @@ HttpResponse::HttpResponse()
       headers(std::unordered_map<std::string, std::string>()),
       body("") {}
 
-//   assigning the given values
+// create HttpResponse object from provided values
 HttpResponse::HttpResponse(const std::string &ver,
                            const int sc,
                            const std::string &sm,
@@ -30,7 +30,7 @@ std::string HttpResponse::getContent()
     return this->body;
 }
 
-// stringify the response
+// stringify the HttpResponse object
 std::string HttpResponse::toString() const
 {
     std::ostringstream oss;
@@ -44,16 +44,19 @@ std::string HttpResponse::toString() const
     return oss.str();
 }
 
+// set the Body content of the HttpRespons object
 void HttpResponse::setContent(const std::string &body)
 {
     this->body = body;
 }
 
+// set the HttpResponse object header
 void HttpResponse::setHeader(const std::pair<std::string, std::string> &header)
 {
     this->headers[header.first] = header.second;
 }
 
+// set the headers of the HttpResponse object
 void HttpResponse::setHeaders(const std::unordered_map<std::string, std::string> &headers)
 {
     this->headers = headers;
@@ -87,12 +90,6 @@ HttpResponse HttpResponse::parse(const std::string &responseBuffer)
             // triming leading spaces
             key.erase(0, key.find_first_not_of(" \t\r\n"));
             value.erase(0, value.find_first_not_of(" \t\r\n"));
-
-            if (key.find("Content-Type") != std::string::npos)
-                std::clog << "content type found: " << value << std::endl;
-
-            if (key.find("Content-Disposition") != std::string::npos)
-                std::clog << "content name found: " << value << std::endl;
 
             res.headers[key] = value;
         }
@@ -128,9 +125,9 @@ void HttpResponse::parseStatusLine(const std::string &responseBuffer)
 // get a map of headers
 std::unordered_map<std::string, std::string> HttpResponse::parseHeaders(const std::string &responseBuffer)
 {
-    size_t headersStart = responseBuffer.find_first_of("\r\n");
+    size_t headersStart = responseBuffer.find("\r\n");
 
-    // when no header is present
+    // when no header is present then return empty map
     if (headersStart == std::string::npos)
         return std::unordered_map<std::string, std::string>();
 
@@ -165,10 +162,14 @@ std::unordered_map<std::string, std::string> HttpResponse::parseHeaders(const st
 // get the content of the body
 std::string HttpResponse::parseBody(const std::string &responseBuffer)
 {
+    // find the headers ending for body start
     size_t bodyStart = responseBuffer.find("\r\n\r\n");
 
+    // if there is no headers ending then whole is the body
     if (bodyStart == std::string::npos)
         bodyStart = 0;
+        
+    // skip the headers ending
     else
         bodyStart += 4;
 

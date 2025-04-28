@@ -1,7 +1,13 @@
 #include "http-request.hpp"
 
-HttpRequest::HttpRequest() {}
+// create a request object from default values
+HttpRequest::HttpRequest()
+    : method("GET"),
+      path("/"),
+      version("HTTP/1.1"),
+      headers(std::unordered_map<std::string, std::string>()) {}
 
+// create a HttpRequest object from the provided params
 HttpRequest::HttpRequest(const std::string &m,
                          const std::string &p,
                          const std::string &v,
@@ -11,6 +17,7 @@ HttpRequest::HttpRequest(const std::string &m,
 {
 }
 
+// stringify the HttpRequest object
 std::string HttpRequest::toString() const
 {
     std::ostringstream oss;
@@ -22,6 +29,8 @@ std::string HttpRequest::toString() const
     oss << "\r\n";
     return oss.str();
 }
+
+// parse the requestBuffer into HttpRequest object
 HttpRequest HttpRequest::parse(const std::string &requestBuffer)
 {
     HttpRequest req;
