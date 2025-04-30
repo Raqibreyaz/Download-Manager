@@ -115,8 +115,8 @@ std::vector<std::string> split(const std::string &str, const char &delim)
     return splittedStr;
 }
 
-// 1 for downloaded, 2 for partially, 0 for file not exist
-int isFileDownloadedOrPartially(const std::string &filename, size_t expectedSize)
+// -1 for not exist, filesize for exist
+long long getFileSizeIfPresent(const std::string &filename)
 {
     std::ifstream file(filename, std::ios::binary);
 
@@ -129,16 +129,9 @@ int isFileDownloadedOrPartially(const std::string &filename, size_t expectedSize
             return 0; // Error reading file size, treat as not existing
 
         size_t fileSize = static_cast<size_t>(pos);
-
-        std::cout << "downloaded size: " << fileSize << std::endl
-                  << "expected size: " << expectedSize << std::endl;
-
-        if (fileSize == expectedSize)
-            return 1; // Fully downloaded
-        else
-            return 2; // Partially downloaded
+        return fileSize;
     }
-    return 0; // File doesn't exist
+    return -1;
 }
 
 // saves the provided data to the given file

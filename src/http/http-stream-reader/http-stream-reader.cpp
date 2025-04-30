@@ -116,70 +116,55 @@ void HttpStreamReader::readChunkedContent(const std::function<void(const std::st
 // read the given Content-Length size data and provide it to the callback
 void HttpStreamReader::readSpecifiedChunkedContent(const size_t contentLength, const std::function<void(const std::string &data)> &callback)
 {
-    if (contentLength == 0)
+    std::string data = preBuffer;
+
+    size_t remainingData = contentLength - data.size();
+
+    size_t noOfChunksCompleted = 0;
+    std::string receivedData = "";
+
+    // receiving data till we get empty data
+    while (!(receivedData = socket->receiveSome(FLUSH_THRESHOLD)).empty())
     {
-        readContent(contentLength, callback);
-        return;
-    }
+        // incrementing when a chunk fetched
+        noOfChunksCompleted++;
 
-    const size_t DEFAULT_CHUNK_SIZE = 8192;
-    const int MAX_EMPTY_RETRIES = 5; // max retries if no data received
-    const int RETRY_DELAY_MS = 100;  // wait 100 ms between retries
+        // decrease what amount of data we fetched
+        remainingData -= receivedData.size();
 
-    std::string accumulatedData = preBuffer;
-    size_t remainingData = contentLength - accumulatedData.size();
+        // adding to fetched data to our stored data
+        data = data + receivedData;
 
-    while (remainingData > 0)
-    {
-        size_t chunkSize = std::min(remainingData, DEFAULT_CHUNK_SIZE);
+        // showing the download status
+        double downloadStatus = ((contentLength - remainingData) * 1.0 / contentLength) * 100;
+        downloadStatus = round(downloadStatus * 10.0) / 10.0;
+        std::clog << "\rdownloading " << downloadStatus << "%" << std::flush;
 
-        int emptyRetries = 0;
-        while (accumulatedData.size() < chunkSize)
+        // for every 5 fetched chunks we are writing to the file
+        if (noOfChunksCompleted % 5 == 0)
         {
-            std::string receivedData = socket->receiveSome(chunkSize - accumulatedData.size());
-            if (receivedData.empty())
-            {
-                if (++emptyRetries > MAX_EMPTY_RETRIES)
-                {
-                    std::cerr << "\nConnection lost or server closed prematurely.\n";
-                    break; // break inner loop after retries
-                }
-                std::this_thread::sleep_for(std::chrono::milliseconds(RETRY_DELAY_MS)); // small wait before retry
-                continue;
-            }
-            emptyRetries = 0; // reset retry counter if some data received
-            accumulatedData += receivedData;
+            callback(data);
+
+            // clear the data as written to the file
+            data.clear();
         }
-
-        if (accumulatedData.empty())
-        {
-            break; // no more data available after retries
-        }
-
-        size_t processSize = std::min(chunkSize, accumulatedData.size());
-        std::string dataToProcess = accumulatedData.substr(0, processSize);
-        callback(dataToProcess);
-        accumulatedData.erase(0, processSize);
-        remainingData -= processSize;
-
-        double downloadStatus = (((contentLength - remainingData) * 1.0) / contentLength) * 100;
-        downloadStatus = std::round(downloadStatus * 10.0) / 10.0;
-        std::clog << "\r" << downloadStatus << "% downloaded" << std::flush;
     }
 
-    // After loop finishes, check if any remaining data is there
-    if (!accumulatedData.empty())
+    std::clog << "\nno of chunks we received: " << noOfChunksCompleted << std::endl;
+
+    // if we doesnt got specified amount of data
+    if (remainingData != 0)
+        std::clog << "Data doesnt received as much as specified" << std::endl;
+
+    // if there is  some data left then write to the file
+    if (!data.empty())
     {
-        // if there's remaining data (even when remainingData = 0), process it
-        callback(accumulatedData);
-        accumulatedData.clear(); // Clear it after processing
+        callback(data);
+        data.clear();
     }
 
-    std::clog << "\r100% downloaded" << std::flush
-              << std::endl
-              << "Download Finished";
-
-    preBuffer = accumulatedData; // Final leftover data will go into preBuffer
+    // adding empty data to prebuffer
+    preBuffer = data;
 }
 
 // extract the chunk size from the chunk

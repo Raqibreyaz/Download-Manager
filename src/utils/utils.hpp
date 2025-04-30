@@ -30,6 +30,6 @@ std::vector<std::string> split(const std::string &str, const char &delim);
 
 void saveToFile(const std::string &filename, const std::string &data);
 
-int isFileDownloadedOrPartially(const std::string& filename,size_t expectedSize);
+long long getFileSizeIfPresent(const std::string& filename);
 
 int hexaDecimalToDecimal(const std::string &num);

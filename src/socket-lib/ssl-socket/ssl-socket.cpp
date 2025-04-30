@@ -103,23 +103,13 @@ std::string SslSocket::receiveAll()
         {
             result.append(buffer, bytesRead);
         }
-        // handle any error occured
-        else
+
+        if (bytesRead < 0)
         {
-            int err = SSL_get_error(ssl, bytesRead);
-
-            // when no data avaialable then exit
-            if (err == SSL_ERROR_ZERO_RETURN)
-                break;
-
-            // when a retriable error to receive data, then retry
-            else if (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE)
-                continue;
-
-            // otherwise throw error
-            else
-                throw std::runtime_error("SSL_read failed with error: " + std::to_string(err));
+            ERR_print_errors_fp(stderr);
+            throw std::runtime_error("SSL_read failed");
         }
+        break;
     }
     return result;
 }
@@ -141,23 +131,14 @@ std::string SslSocket::receiveSome(const int size)
             result.append(buffer, bytesRead);
             totalBytesRead += bytesRead;
         }
-        // handle any error occured
-        else
+
+        if (bytesRead < 0)
         {
-            int err = SSL_get_error(ssl, bytesRead);
-
-            // when no data avaialable then exit
-            if (err == SSL_ERROR_ZERO_RETURN)
-                break;
-
-            // when a retriable error to receive data, then retry
-            else if (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE)
-                continue;
-
-            // otherwise throw error
-            else
-                throw std::runtime_error("SSL_read failed with error: " + std::to_string(err));
+            ERR_print_errors_fp(stderr);
+            throw std::runtime_error("SSL_read failed");
         }
+        else
+            break;
     }
     return result;
 }

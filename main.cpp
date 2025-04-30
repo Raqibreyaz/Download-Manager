@@ -61,6 +61,8 @@ int main(int argc, char const *argv[])
         // read headers first
         std::string headerString = reader.readHeaders();
 
+        std::clog << "received headers: " << headerString << std::endl;
+
         // set the received headers
         res.setHeaders(HttpResponse::parseHeaders(headerString));
 
@@ -75,18 +77,23 @@ int main(int argc, char const *argv[])
         auto [filename, extension] = getFilenameAndExtension(contentDisposition, contentType, actualUrl);
         std::clog << "filename " << filename << extension << std::endl;
 
-        int fileDownloadStatus = isFileDownloadedOrPartially("downloads/" + filename + extension, contentLength);
+        long long fileSize = getFileSizeIfPresent("downloads/" + filename + extension);
 
-        std::clog << "file download status: " << fileDownloadStatus << std::endl;
-
-        // when file is already downloaded then skip downloading
-        if (fileDownloadStatus == 1)
+        if (fileSize != -1)
         {
-            std::clog << "file is already downloaded" << std::endl;
-            sock->closeConnection();
-            return 0;
-        }
+            bool isFileDownloaded = fileSize == (long long)contentLength;
 
+            std::clog << (long long)contentLength - fileSize
+                      << " bytes remaining to download from "
+                      << contentLength << " bytes" << std::endl;
+
+            // when file is already downloaded then skip downloading
+            if (isFileDownloaded)
+            {
+                sock->closeConnection();
+                return 0;
+            }
+        }
         // handle chunked data(will be saved to file)
         if (res.getHeader("Transfer-Encoding") == "chunked")
         {
