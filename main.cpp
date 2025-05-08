@@ -1,127 +1,92 @@
 #include "src/http/http-request/http-request.hpp"
 #include "src/http/http-response/http-response.hpp"
 #include "src/http/http-stream-reader/http-stream-reader.hpp"
-#include "src/socket-lib/tcp-socket/tcp-socket.hpp"
 #include "src/socket-lib/ssl-socket/ssl-socket.hpp"
+#include "src/socket-lib/tcp-socket/tcp-socket.hpp"
 #include "src/utils/utils.hpp"
+#include <cstddef>
+#include <functional>
 #include <iostream>
-#include <string>
 #include <memory>
+#include <string>
 
-int main(int argc, char const *argv[])
-{
-    if (argc < 2)
-    {
-        std::cerr << "url required!!";
-        exit(EXIT_FAILURE);
-    }
+int main(int argc, char const *argv[]) {
+  if (argc < 2) {
+    std::cerr << "url required!!";
+    exit(EXIT_FAILURE);
+  }
 
-    std::string actualUrl(argv[1]);
+  std::string actualUrl(argv[1]);
 
-    // extract the host, path and port from the url
-    ParsedUrl url = parseUrl(actualUrl);
+  // extract the host, path and port from the url
+  ParsedUrl url = parseUrl(actualUrl);
 
-    // create a HttpRequest object for requesting to server
-    HttpRequest req(
-        "GET", url.path, "HTTP/1.1",
-        {{"Accept", "*/*"},
-         {"Host", url.host},
-         {"User-Agent",
-          "Mozilla/5.0 "
-          "(Windows NT 10.0; Win64; x64) "
-          "AppleWebKit/537.36 "
-          "(KHTML, like Gecko) "
-          "Chrome/91.0.4472.124 "
-          "Safari/537.36"},
-         {"Connection", "close"}});
+  // create a HttpRequest object for requesting to server
+  HttpRequest req("GET", url.path, "HTTP/1.1",
+                  {{"Accept", "*/*"},
+                   {"Host", url.host},
+                   {"User-Agent", "Mozilla/5.0 "
+                                  "(Windows NT 10.0; Win64; x64) "
+                                  "AppleWebKit/537.36 "
+                                  "(KHTML, like Gecko) "
+                                  "Chrome/91.0.4472.124 "
+                                  "Safari/537.36"},
+                   {"Connection", "close"}});
 
-    // a socket for connecting, sending/receiving data to/from server
-    std::shared_ptr<ISocket> sock;
+  // a socket for connecting, sending/receiving data to/from server
+  std::shared_ptr<ISocket> sock;
 
-    // for storing the response from server
-    HttpResponse res;
+  // for storing the response from server
+  HttpResponse res;
 
-    try
-    {
-        // create a socket for that host and port
-        if (actualUrl.find("https") != std::string::npos)
-            sock = std::make_shared<SslSocket>(url.host, url.port);
-        else
-            sock = std::make_shared<TcpSocket>(url.host, url.port);
+  try {
+    // create a socket for that host and port
+    if (actualUrl.find("https") != std::string::npos)
+      sock = std::make_shared<SslSocket>(url.host, url.port);
+    else
+      sock = std::make_shared<TcpSocket>(url.host, url.port);
 
-        // connect to the server
-        sock->connectToServer();
+    // connect to the server
+    sock->connectToServer();
 
-        // send request to server
-        sock->sendAll(req.toString());
+    // send request to server
+    sock->sendAll(req.toString());
 
-        // a reader helper to read different kinds of data
-        HttpStreamReader reader(sock);
+    // a reader helper to read different kinds of data
+    HttpStreamReader reader(sock);
 
-        // read headers first
-        std::string headerString = reader.readHeaders();
+    const std::string statusLineString = reader.readStatusLine();
+    const std::string headerString = reader.readHeaders();
 
-        std::clog << "received headers: " << headerString << std::endl;
+    // std::clog << statusLineString << "\n\n" << headerString << std::endl;
 
-        // set the received headers
-        res.setHeaders(HttpResponse::parseHeaders(headerString));
+    // set status, headers
+    res.parseStatusLine(statusLineString);
+    res.setHeaders(HttpResponse::parseHeaders(headerString));
 
-        // extract key info from the headers
-        std::string contentLengthString = res.getHeader("Content-Length");
-        std::string contentType = res.getHeader("Content-Type");
-        std::string contentDisposition = res.getHeader("Content-Disposition");
-        size_t contentLength =
-            contentLengthString.empty() ? 0 : std::stoi(contentLengthString);
+    const std::string contentLengthString = res.getHeader("Content-Length");
+    const size_t contentLength =
+        std::stoi(contentLengthString.empty() ? "0" : contentLengthString);
 
-        // find the filename with extension
-        auto [filename, extension] = getFilenameAndExtension(contentDisposition, contentType, actualUrl);
-        std::clog << "filename " << filename << extension << std::endl;
+    std::clog << statusLineString << std::endl << headerString << std::endl;
 
-        long long fileSize = getFileSizeIfPresent("downloads/" + filename + extension);
+    auto [filename, extension] =
+        getFilenameAndExtension(res.getHeader("Content-Disposition"),
+                                res.getHeader("Content-Type"), actualUrl);
 
-        if (fileSize != -1)
-        {
-            bool isFileDownloaded = fileSize == (long long)contentLength;
+    const std::function<void(const std::string &data)> callback =
+        [filename, extension](const std::string &data) {
+          saveToFile("downloads/" + filename + extension, data);
+        };
 
-            std::clog << (long long)contentLength - fileSize
-                      << " bytes remaining to download from "
-                      << contentLength << " bytes" << std::endl;
+    const std::string contentString =
+        reader.readContent(callback, contentLength);
 
-            // when file is already downloaded then skip downloading
-            if (isFileDownloaded)
-            {
-                sock->closeConnection();
-                return 0;
-            }
-        }
-        // handle chunked data(will be saved to file)
-        if (res.getHeader("Transfer-Encoding") == "chunked")
-        {
-            std::clog << "chunked transfer found" << std::endl;
-            reader.readChunkedContent([filename, extension](const std::string &data)
-                                      { saveToFile("downloads/" + filename + extension, data); });
-        }
+    // finally close the connection to server
+    sock->closeConnection();
+  } catch (const std::exception &e) {
+    std::cerr << e.what() << '\n';
+  }
 
-        // log text like content
-        else if (contentType.starts_with("text/") || contentType.starts_with("application/json"))
-        {
-            std::clog << reader.readContent(contentLength) << std::endl;
-        }
-
-        // handle receiving large data(will be saved to file)
-        else
-        {
-            reader.readSpecifiedChunkedContent(contentLength, [filename, extension](const std::string &data)
-                                               { saveToFile("downloads/" + filename + extension, data); });
-        }
-
-        // finally close the connection to server
-        sock->closeConnection();
-    }
-    catch (const std::exception &e)
-    {
-        std::cerr << e.what() << '\n';
-    }
-
-    return 0;
+  return 0;
 }
